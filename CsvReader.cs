@@ -4,15 +4,11 @@ using System;
 
 namespace sudoku_hinter_cs {
 	public class CsvReader {
-	// public List<List<int>> ReadSudokuBoard(string FileName) {
 		public SudokuBoard ReadSudokuBoard(string FileName) {
 			var lineCount = File.ReadAllLines(FileName).Length;
-			// int[,] board;
-			// List<List<int>> board = new List<List<int>>();
 			SudokuBoard board = new SudokuBoard();
 
 			using(StreamReader reader = new StreamReader(FileName)) {
-				// int[] row;
 				List<int> row = new List<int>();
 				int currIdx = 0;
 

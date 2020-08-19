@@ -6,19 +6,17 @@ namespace sudoku_hinter_cs {
 	public class SudokuBoard {
 		public List<List<int>> Board { get; set; }
 		public int Count { get => Board.Count; }
-		public List<int> AllPossibleNums { get; }
-		public Dictionary<Cell, List<int>> AvailableChoices { get; set; }
-		public int SubSqSize { get; set; }
-		//public static Random Rand;
-		public static Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
-
+		private List<int> AllPossibleNums { get; }
+		private List<KeyValuePair<Cell, List<int>>> AvailableChoices;
+		private int SubSqSize { get; set; }
+		private static Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
 
 		public SudokuBoard() {
 			Board = new List<List<int>>();
 			Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
 			AllPossibleNums = new List<int>();
-			AvailableChoices = new Dictionary<Cell, List<int>>();
-		}
+            AvailableChoices = new List<KeyValuePair<Cell, List<int>>>();
+        }
 		public SudokuBoard(List<List<int>> new_board) {
 			Board = new_board;
 			for (int ii = 1; ii <= Board.Count; ii++) {
@@ -26,8 +24,9 @@ namespace sudoku_hinter_cs {
 			}
 			SubSqSize = (int)Math.Sqrt(Board.Count);
 			Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
-			AllPossibleNums = new List<int>();
-			AvailableChoices = new Dictionary<Cell, List<int>>();
+            AllPossibleNums = new List<int>();
+			AvailableChoices = new List<KeyValuePair<Cell, List<int>>>();
+			UpdateChoices();
 		}
 
 		public void AddRow(List<int> row) {
@@ -38,6 +37,10 @@ namespace sudoku_hinter_cs {
 					AllPossibleNums.Add(ii);
 				}
 			}
+			if (SubSqSize == 0)
+            {
+				SubSqSize = (int)Math.Sqrt(row.Count);
+            }
 		}
 
 		public int this[int idx1, int idx2] {
@@ -85,13 +88,13 @@ namespace sudoku_hinter_cs {
 		}
 
 		public List<int> GetNumsInSubsquare(Cell cell) {
-			int SubSqRowIdx   = (int)Math.Floor((double)cell.row);
+			int SubSqRowIdx   = (int)Math.Floor((double)cell.row / SubSqSize);
 			int SubSqRowStart = SubSqRowIdx * SubSqSize;
 			int SubSqRowEnd   = SubSqRowStart + SubSqSize;
 
-			int SubSqColIdx   = (int)Math.Floor((double)cell.col);
+			int SubSqColIdx   = (int)Math.Floor((double)cell.col / SubSqSize);
 			int SubSqColStart = SubSqColIdx * SubSqSize;
-			int SubSqColEnd   = SubSqRowStart + SubSqSize;
+			int SubSqColEnd   = SubSqColStart + SubSqSize;
 
 			List<int> SubSq = new List<int>();
 			for (int row = SubSqRowStart; row < SubSqRowEnd; row++) {
@@ -107,40 +110,53 @@ namespace sudoku_hinter_cs {
 		public void Solve(Cell LastModifiedCell) {
 			UpdateChoices();
 
-			foreach (Cell cell in AvailableChoices.Keys.AsEnumerable().ToList())
+			int iterIdx = 0;
+			while (iterIdx < AvailableChoices.Count)
             {
+                (Cell cell, List<int> choices) = AvailableChoices[iterIdx];
+				iterIdx++;
+				if (cell == null)
+                {
+					Board[LastModifiedCell.row][LastModifiedCell.col] = 0;
+					UpdateChoices();
+					return;
+				}
+
 				if (CheckPuzzle())
                 {
 					return;
                 }
 
-				while (Board[cell.row][cell.col] == 0)
+                while (Board[cell.row][cell.col] == 0)
                 {
-					// Backtrack if we can go no further down this branch
-					if (AvailableChoices[cell].Count == 0)
+                    // Backtrack if we can go no further down this branch
+                    if (choices.Count == 0)
                     {
-						Board[cell.row][cell.col] = 0;
-						Board[LastModifiedCell.row][LastModifiedCell.col] = 0;
-						UpdateChoices();
-						return;
+                        Board[cell.row][cell.col] = 0;
+                        Board[LastModifiedCell.row][LastModifiedCell.col] = 0;
+                        UpdateChoices();
+                        return;
                     }
 
-					int idx = Rand.Next(0, AvailableChoices[cell].Count);
-					int temp = AvailableChoices[cell].ElementAt(idx);
-					AvailableChoices[cell].RemoveAt(idx);
+                    int idx = Rand.Next(0, choices.Count);
+                    int temp = choices.ElementAt(idx);
+                    choices.RemoveAt(idx);
 
-					Board[cell.row][cell.col] = temp;
-					Solve(cell);
+                    Board[cell.row][cell.col] = temp;
+                    Solve(cell);
+                }
+				if (CheckPuzzle())
+				{
+					return;
 				}
 			}
-			if (CheckPuzzle())
-            {
-				return;
-            }
 		}
 
 		/// Updates dictionary that keeps track of which values are available for each cell
 		public void UpdateChoices() {
+			// Unfortunately, since we can't use a dict ordered by length of the lists being used as the values we have
+			// to do this to prevent `AvailableChoices` from accumulating its entire history of key-value pairs
+			AvailableChoices.Clear();
 			for (int ii = 0; ii < Board.Count; ii++) {
 				for (int jj = 0; jj < Board.Count; jj++) {
 					Cell cell = new Cell(ii, jj);
@@ -152,12 +168,13 @@ namespace sudoku_hinter_cs {
 
 					if (AllTakenNums.Count > 0)
 					{
-						List<int> ValidChoices = AllPossibleNums.Where(x => !AllTakenNums.Contains(x)).ToList();
-						AvailableChoices[cell] = ValidChoices;
+						List<int> validChoices = AllPossibleNums.Where(x => !AllTakenNums.Contains(x)).ToList();
+						AvailableChoices.Add(new KeyValuePair<Cell, List<int>>(cell, validChoices));
 					}
 				}
 			}
-			if (AvailableChoices.Count > Board.Count)
+			AvailableChoices.Sort((x, y) => x.Value.Count.CompareTo(y.Value.Count));
+			if (AvailableChoices.Count > Board.Count * Board.Count)
             {
 				throw new ArgumentException("Should never have more entries than cells on the board!");
             }
