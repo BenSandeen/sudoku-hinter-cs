@@ -7,13 +7,16 @@ namespace sudoku_hinter_cs
         static void Main(string[] args)
         {
 			CsvReader csvReader = new CsvReader();
-			SudokuBoard board = csvReader.ReadSudokuBoard(@"/home/ubuntu/Documents/projects/c#/sudoku-hinter-cs/sample_puzzle.csv");
+			SudokuBoard board = csvReader.ReadSudokuBoard(@"A:\Documents\Projects\c#\sudoku-hinter-cs\sample_puzzle.csv");
 			Console.WriteLine($"Board stuff: {board[0, 4]}");
+			board.Solve(new Cell(0, 0));
+
+			board.Print();
         }
 
-		public void solve(SudokuBoard board, Cell LastModifiedCell) {
-			board.update_choices();
-		}
+		//public void solve(SudokuBoard board, Cell LastModifiedCell) {
+		//	board.update_choices();
+		//}
 
 		// public void update_choices(SudokuBoard board) {
 		// 	for (int ii = 0; ii < board.Count; ii++) {

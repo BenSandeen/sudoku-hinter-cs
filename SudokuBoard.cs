@@ -3,15 +3,21 @@ using System;
 using System.Linq;
 
 namespace sudoku_hinter_cs {
-    public class SudokuBoard {
+	public class SudokuBoard {
 		public List<List<int>> Board { get; set; }
 		public int Count { get => Board.Count; }
 		public List<int> AllPossibleNums { get; }
-		public Dictionary<Cell, List<int>> AvailableChoices{ get; set; }
+		public Dictionary<Cell, List<int>> AvailableChoices { get; set; }
 		public int SubSqSize { get; set; }
+		//public static Random Rand;
+		public static Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
+
 
 		public SudokuBoard() {
 			Board = new List<List<int>>();
+			Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
+			AllPossibleNums = new List<int>();
+			AvailableChoices = new Dictionary<Cell, List<int>>();
 		}
 		public SudokuBoard(List<List<int>> new_board) {
 			Board = new_board;
@@ -19,10 +25,19 @@ namespace sudoku_hinter_cs {
 				AllPossibleNums.Add(ii);
 			}
 			SubSqSize = (int)Math.Sqrt(Board.Count);
+			Random Rand = new Random(DateTime.Now.ToString().GetHashCode());
+			AllPossibleNums = new List<int>();
+			AvailableChoices = new Dictionary<Cell, List<int>>();
 		}
 
 		public void AddRow(List<int> row) {
 			Board.Add(row);
+			if (AllPossibleNums.Count == 0) {
+				for (int ii = 1; ii <= row.Count; ii++)
+				{
+					AllPossibleNums.Add(ii);
+				}
+			}
 		}
 
 		public int this[int idx1, int idx2] {
@@ -75,12 +90,12 @@ namespace sudoku_hinter_cs {
 			int SubSqRowEnd   = SubSqRowStart + SubSqSize;
 
 			int SubSqColIdx   = (int)Math.Floor((double)cell.col);
-			int SubSqColStart = SubSqRowIdx * SubSqSize;
+			int SubSqColStart = SubSqColIdx * SubSqSize;
 			int SubSqColEnd   = SubSqRowStart + SubSqSize;
 
 			List<int> SubSq = new List<int>();
 			for (int row = SubSqRowStart; row < SubSqRowEnd; row++) {
-				for (int col = SubSqRowStart; col < SubSqRowEnd; col++) {
+				for (int col = SubSqColStart; col < SubSqColEnd; col++) {
 					if (Board[row][col] != 0) {
 						SubSq.Add(Board[row][col]);
 					}
@@ -89,10 +104,39 @@ namespace sudoku_hinter_cs {
 			return SubSq;
 		}
 
-		public Solve(Cell LastModifiedCell) {
+		public void Solve(Cell LastModifiedCell) {
 			UpdateChoices();
 
-			foreach (Cell cell in AvailableChoices.)
+			foreach (Cell cell in AvailableChoices.Keys.AsEnumerable().ToList())
+            {
+				if (CheckPuzzle())
+                {
+					return;
+                }
+
+				while (Board[cell.row][cell.col] == 0)
+                {
+					// Backtrack if we can go no further down this branch
+					if (AvailableChoices[cell].Count == 0)
+                    {
+						Board[cell.row][cell.col] = 0;
+						Board[LastModifiedCell.row][LastModifiedCell.col] = 0;
+						UpdateChoices();
+						return;
+                    }
+
+					int idx = Rand.Next(0, AvailableChoices[cell].Count);
+					int temp = AvailableChoices[cell].ElementAt(idx);
+					AvailableChoices[cell].RemoveAt(idx);
+
+					Board[cell.row][cell.col] = temp;
+					Solve(cell);
+				}
+			}
+			if (CheckPuzzle())
+            {
+				return;
+            }
 		}
 
 		/// Updates dictionary that keeps track of which values are available for each cell
@@ -106,32 +150,62 @@ namespace sudoku_hinter_cs {
 					var NumsInSubSq  = GetNumsInSubsquare(cell);
 					var AllTakenNums = NumsInRow.Concat(NumsInCol).Concat(NumsInSubSq).ToList();
 
-					List<int> ValidChoices = AllPossibleNums.Where(x => !AllTakenNums.Contains(x)).ToList();
-					AvailableChoices[cell] = ValidChoices;
-				}
-			}
-		}
-
-		public bool CheckPuzzle() {
-			foreach (var row in Board) {
-				if (AllPossibleNums.Any(x => !row.Contains(x))) {
-					return false;
-				}
-			}
-			for (int jj = 0; jj < Board.Count; jj++) {
-				if (AllPossibleNums.Any(x => !GetCol(new Cell(0, jj)).Contains(x))) {
-					return false;
-				}
-			}
-			for (int SubSqRowIdx = 0; SubSqRowIdx < Board.Count; SubSqRowIdx += SubSqSize) {
-				for (int SubSqColIdx = 0; SubSqColIdx < Board.Count; SubSqColIdx += SubSqSize) {
-					var SubSq = GetNumsInSubsquare(new Cell(SubSqRowIdx, SubSqColIdx));
-					if (AllPossibleNums.Any(x => !SubSq.Contains(x))) {
-						return false;
+					if (AllTakenNums.Count > 0)
+					{
+						List<int> ValidChoices = AllPossibleNums.Where(x => !AllTakenNums.Contains(x)).ToList();
+						AvailableChoices[cell] = ValidChoices;
 					}
 				}
 			}
-			return true;
+			if (AvailableChoices.Count > Board.Count)
+            {
+				throw new ArgumentException("Should never have more entries than cells on the board!");
+            }
 		}
+
+        public bool CheckPuzzle()
+        {
+            foreach (var row in Board)
+            {
+                if (AllPossibleNums.Any(x => !row.Contains(x)))
+                {
+                    return false;
+                }
+            }
+            for (int jj = 0; jj < Board.Count; jj++)
+            {
+                if (AllPossibleNums.Any(x => !GetCol(new Cell(0, jj)).Contains(x)))
+                {
+                    return false;
+                }
+            }
+            for (int SubSqRowIdx = 0; SubSqRowIdx < Board.Count; SubSqRowIdx += SubSqSize)
+            {
+                for (int SubSqColIdx = 0; SubSqColIdx < Board.Count; SubSqColIdx += SubSqSize)
+                {
+                    var SubSq = GetNumsInSubsquare(new Cell(SubSqRowIdx, SubSqColIdx));
+                    if (AllPossibleNums.Any(x => !SubSq.Contains(x)))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+		/// <summary>
+		/// Just prints board
+		/// </summary>
+		public void Print()
+        {
+			foreach (var row in Board)
+            {
+				foreach (int val in row)
+                {
+					Console.Write($"{val}");
+                }
+				Console.WriteLine();
+            }
+        }
     }
 }
